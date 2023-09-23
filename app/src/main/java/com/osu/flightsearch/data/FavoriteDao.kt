@@ -1,3 +1,9 @@
+/*
+Assignment 5: Flight Search App (Data Persistence)
+Ryan Speese / speeser@oregonstate.edu
+OSU / CS 492
+ */
+
 package com.osu.flightsearch.data
 
 import androidx.room.Dao
@@ -15,6 +21,6 @@ interface FavoriteDao {
     @Delete
     suspend fun delete(favorite: Favorite)
 
-    @Query("SELECT * from favorites")
+    @Query("SELECT * from favorite")
     fun getAllFavoriteFlights(): Flow<List<Favorite>>
 }

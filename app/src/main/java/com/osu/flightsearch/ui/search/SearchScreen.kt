@@ -1,7 +1,13 @@
+/*
+Assignment 5: Flight Search App (Data Persistence)
+Ryan Speese / speeser@oregonstate.edu
+OSU / CS 492
+ */
+
 package com.osu.flightsearch.ui.search
 
-import androidx.annotation.ColorRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -28,96 +35,112 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.osu.flightsearch.R
 import com.osu.flightsearch.data.Airport
 import com.osu.flightsearch.data.Favorite
+import com.osu.flightsearch.ui.AppViewModelProvider
 import com.osu.flightsearch.ui.theme.FlightSearchTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SearchScreen(
     modifier: Modifier = Modifier,
-    viewModel: SearchViewModel
+    viewModel: SearchViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val flightSearchUiState = viewModel.flightSearchUiState.collectAsState()
-    val favoritesUiState = viewModel.favoritesUiState.collectAsState()
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(title = { Text("Flight Search")})
         }, modifier = modifier
     ) { innerPadding ->
-        SearchBody(
-            flightSearchUiState = flightSearchUiState.value,
-            favoritesUiState = favoritesUiState.value,
-            modifier = Modifier.padding(innerPadding)
-        )
-    }
-}
+        Column(
+            modifier = modifier.padding(innerPadding),
+            verticalArrangement = Arrangement.SpaceEvenly,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            val favoriteListUiState = viewModel.favoriteListUiState.collectAsState()
+            val searchString = viewModel.searchStringState.value
+            val selectedAirport = viewModel.selectedAirportState.value
+            var text by remember { mutableStateOf(TextFieldValue("")) }
+            val keyboardController = LocalSoftwareKeyboardController.current
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SearchBody(
-    flightSearchUiState: FlightSearchUiState,
-    favoritesUiState: FavoritesUiState,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.SpaceEvenly,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        var text by remember { mutableStateOf(TextFieldValue("")) }
-        val chosenAirport: Airport = Airport(0, "FCO", "Da Vinci Airport", 100)
+            //search bar
+            TextField(
+                value = text,
+                onValueChange = { newText ->
+                    text = newText
+                    viewModel.updateSearchString(newText.text)
+                    viewModel.updateSelectedAirport(Airport())
+                },
+                placeholder = { Text(text = "Enter departure airport") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done
+                ),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "searchIcon"
+                    )
+                },
+                keyboardActions = KeyboardActions(
+                    onDone = {keyboardController?.hide()},
+                    onSearch = { keyboardController?.hide() }
+                ),
+                modifier = modifier.padding(top = 20.dp, bottom = 30.dp)
+            )
 
-        //search bar
-        TextField(
-            value = text,
-            onValueChange = { newText ->
-                text = newText
-            },
-            placeholder = { Text(text = "Enter departure airport") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "searchIcon"
+            if(searchString.isEmpty()) {
+                FavoritesList(
+                    favesList = favoriteListUiState.value,
+                    onUnfavorite = { viewModel.unFavoriteFlight(it) },
+                    modifier = modifier
                 )
-            }, modifier = modifier.padding(top = 20.dp, bottom = 30.dp)
-        )
-        //if empty -> favoritesList()
-        FavoritesList(
-            favesList = favoritesUiState.favoritesList,
-            modifier = modifier
-        )
-        // if typing -> searchSuggestionsList()
-//        SearchSuggestionsList(
-//            searchSuggestionsList = flightSearchUiState.airportsList,
-//            modifier = modifier
-//        )
-        // if chosenAirport clicked -> flightsList() and fill search bar with AirportCode
-//        RoutesList(
-//            routesList = flightSearchUiState.airportsList,
-//            departingAirport = chosenAirport,
-//            modifier = modifier
-//        )
+            } else {
+                if(selectedAirport.iata_code.isEmpty()) {
+                    SearchSuggestionsList(
+                        searchSuggestionsList = viewModel.airportsList.value,
+                        onChooseAirport = { viewModel.updateSelectedAirport(it)},
+                        modifier = modifier
+                    )
+                } else {
+                    RoutesList(
+                        routesList = viewModel.routesList.value,
+                        departingAirport = selectedAirport,
+                        onFavorite = { viewModel.addFavoriteFlight(it) },
+                        onUnfavorite = { viewModel.unFavoriteFlight(it) },
+                        modifier = modifier
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun FavoritesList(
     favesList: List<Favorite>,
+    onUnfavorite: (Favorite?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Text(
@@ -131,7 +154,7 @@ private fun FavoritesList(
         modifier = modifier.fillMaxSize()
     ) {
         items(favesList) {fave ->
-            FavoriteRow(fave, true)
+            FavoriteRow(fave, onUnfavorite)
         }
     }
 }
@@ -139,7 +162,7 @@ private fun FavoritesList(
 @Composable
 private fun FavoriteRow(
     fave: Favorite,
-    favorited: Boolean,
+    onUnFavorite: (Favorite?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -159,7 +182,7 @@ private fun FavoriteRow(
                     modifier = modifier.padding(8.dp)
                 )
                 Text(
-                    text = fave.departureCode,
+                    text = fave.departure_code,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = modifier.padding(8.dp)
@@ -172,17 +195,16 @@ private fun FavoriteRow(
                     modifier = modifier.padding(8.dp)
                 )
                 Text(
-                    text = fave.destinationCode,
+                    text = fave.destination_code,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = modifier.padding(8.dp)
                 )
             }
         }
-        IconButton(onClick = { /*TODO*/ }) {
-            //TODO: based on favorited bool, show filled or outlined
+        IconButton(onClick = {onUnFavorite(fave)}) {
             Icon(
-                Icons.Outlined.Favorite,
+                Icons.Filled.Favorite,
                 contentDescription = "Favorite",
                 modifier = modifier.size(24.dp)
             )
@@ -193,6 +215,7 @@ private fun FavoriteRow(
 @Composable
 private fun SearchSuggestionsList(
     searchSuggestionsList: List<Airport>,
+    onChooseAirport: (Airport) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -201,10 +224,15 @@ private fun SearchSuggestionsList(
     ) {
         items(searchSuggestionsList) { airport ->
             Row(
-                modifier = modifier.padding(8.dp)
+                modifier = modifier
+                    .padding(8.dp)
+                    .background(color = colorResource(id = R.color.light_grey))
+                    .clickable {
+                        onChooseAirport(airport)
+                    }
             ){
                 Text(
-                    text = airport.iataCode,
+                    text = airport.iata_code,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
@@ -216,14 +244,18 @@ private fun SearchSuggestionsList(
     }
 }
 
+
+
 @Composable
 private fun RoutesList(
     routesList: List<Airport>,
     departingAirport: Airport,
+    onFavorite: (Favorite?) -> Unit,
+    onUnfavorite: (Favorite?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Text(
-        text = "Flights from " + departingAirport.iataCode,
+        text = "Flights from " + departingAirport.iata_code,
         fontWeight = FontWeight.Bold,
         modifier = modifier.padding(bottom = 8.dp)
     )
@@ -233,7 +265,12 @@ private fun RoutesList(
         modifier = modifier.fillMaxSize()
     ) {
         items(routesList) {airport ->
-            RouteRow(departingAirport = departingAirport, arrivingAirport = airport)
+            RouteRow(
+                departingAirport = departingAirport,
+                arrivingAirport = airport,
+                onFavorite = onFavorite,
+                onUnfavorite = onUnfavorite
+            )
         }
     }
 }
@@ -242,6 +279,8 @@ private fun RoutesList(
 private fun RouteRow(
     departingAirport: Airport,
     arrivingAirport: Airport,
+    onFavorite: (Favorite?) -> Unit,
+    onUnfavorite: (Favorite?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -253,6 +292,12 @@ private fun RouteRow(
             .background(color = colorResource(id = R.color.light_grey))
             .fillMaxSize(0.7F)
     ) {
+        var addedToFaves = false
+        val fave = Favorite(
+            departure_code = departingAirport.iata_code,
+            destination_code = arrivingAirport.iata_code
+        )
+
         Column() {
             Text(
                 text = "DEPART",
@@ -263,7 +308,7 @@ private fun RouteRow(
                 modifier = modifier.padding(start = 8.dp)
             ) {
                 Text(
-                    text = departingAirport.iataCode,
+                    text = departingAirport.iata_code,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -282,7 +327,7 @@ private fun RouteRow(
                 modifier = modifier.padding(start = 8.dp, bottom = 8.dp)
             ) {
                 Text(
-                    text = arrivingAirport.iataCode,
+                    text = arrivingAirport.iata_code,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -293,7 +338,15 @@ private fun RouteRow(
                 )
             }
         }
-        IconButton(onClick = { /*TODO*/ }) {
+        IconButton(onClick = {
+            if(!addedToFaves) {
+                onFavorite(fave)
+                addedToFaves = true
+            } else {
+                onUnfavorite(fave)
+                addedToFaves = false
+            }
+        }) {
             Icon(
                 Icons.Outlined.Favorite,
                 contentDescription = "Favorite",
@@ -308,15 +361,15 @@ private fun RouteRow(
 @Composable
 fun SearchScreenPreview() {
     FlightSearchTheme {
-        SearchBody(
-            FlightSearchUiState(listOf(
-                Airport(0, "ATH", "Athens Airport", 100),
-                Airport(1, "CHI", "O'Hare Airport", 90)
-            )),
-            FavoritesUiState(listOf(
-                Favorite(0, "ATH", "CHI"),
-                Favorite(1, "FCO", "LIS")
-            ))
-        )
+//        SearchBody(
+//            FlightSearchUiState(listOf(
+//                Airport(0, "ATH", "Athens Airport", 100),
+//                Airport(1, "CHI", "O'Hare Airport", 90)
+//            )),
+//            FavoritesUiState(listOf(
+//                Favorite(0, "ATH", "CHI"),
+//                Favorite(1, "FCO", "LIS")
+//            )),
+//        )
     }
 }

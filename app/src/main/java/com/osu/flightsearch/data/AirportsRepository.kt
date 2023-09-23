@@ -1,9 +1,15 @@
+/*
+Assignment 5: Flight Search App (Data Persistence)
+Ryan Speese / speeser@oregonstate.edu
+OSU / CS 492
+ */
+
 package com.osu.flightsearch.data
 
 import kotlinx.coroutines.flow.Flow
 
 interface AirportsRepository {
-    fun getMatchingAirportsStream(codeEntered: String, nameEntered: String): Flow<List<Airport>>
+    fun getMatchingAirportsList(searchString: String): List<Airport>
 
-    fun getArrivalAirportsStream(codeSelected: String): Flow<List<Airport>>
+    fun getArrivalAirportsList(codeSelected: String): List<Airport>
 }

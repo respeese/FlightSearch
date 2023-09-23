@@ -1,3 +1,9 @@
+/*
+Assignment 5: Flight Search App (Data Persistence)
+Ryan Speese / speeser@oregonstate.edu
+OSU / CS 492
+ */
+
 package com.osu.flightsearch.data
 
 import androidx.room.Dao
@@ -8,9 +14,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AirportDao {
-    @Query("SELECT * from airports WHERE iataCode LIKE '%'+:codeEntered+'%' OR name LIKE '%'+:nameEntered+'%' ORDER BY passengers DESC")
-    fun getMatchingAirports(codeEntered: String, nameEntered: String): Flow<List<Airport>>
+    @Query("SELECT * from airport WHERE iata_code LIKE '%' || :searchString || '%' OR name LIKE '%' || :searchString || '%' ORDER BY passengers DESC")
+    fun getMatchingAirports(searchString: String): List<Airport>
 
-    @Query("SELECT * from airports WHERE NOT iataCode LIKE :codeSelected")
-    fun getArrivalAirports(codeSelected: String): Flow<List<Airport>>
+    @Query("SELECT * from airport WHERE NOT iata_code = :codeSelected")
+    fun getArrivalAirports(codeSelected: String): List<Airport>
 }
