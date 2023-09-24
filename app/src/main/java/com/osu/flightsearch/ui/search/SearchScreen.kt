@@ -6,6 +6,7 @@ OSU / CS 492
 
 package com.osu.flightsearch.ui.search
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,13 +24,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,9 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,10 +60,8 @@ import com.osu.flightsearch.data.Airport
 import com.osu.flightsearch.data.Favorite
 import com.osu.flightsearch.ui.AppViewModelProvider
 import com.osu.flightsearch.ui.theme.FlightSearchTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import com.osu.flightsearch.ui.theme.Gold
+import com.osu.flightsearch.ui.theme.Gray
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -70,7 +71,7 @@ fun SearchScreen(
 ) {
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(title = { Text("Flight Search")})
+            CenterAlignedTopAppBar(title = { Text(text = "Flight Search", fontSize = 25.sp, fontWeight = FontWeight.Bold)})
         }, modifier = modifier
     ) { innerPadding ->
         Column(
@@ -107,7 +108,8 @@ fun SearchScreen(
                     onDone = {keyboardController?.hide()},
                     onSearch = { keyboardController?.hide() }
                 ),
-                modifier = modifier.padding(top = 20.dp, bottom = 30.dp)
+                colors = TextFieldDefaults.textFieldColors(containerColor = Gray),
+                modifier = modifier.padding(top = 150.dp, bottom = 30.dp)
             )
 
             if(searchString.isEmpty()) {
@@ -170,9 +172,9 @@ private fun FavoriteRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = modifier
             .padding(bottom = 6.dp)
-            .background(color = colorResource(id = R.color.light_grey))
             .fillMaxSize(0.7F)
-            .clip(RoundedCornerShape(topEnd = 8.dp, bottomStart = 8.dp))
+            .clip(RoundedCornerShape(topEnd = 16.dp, bottomStart = 16.dp))
+            .background(color = Gold)
     ) {
         Column() {
             Row() {
@@ -226,7 +228,6 @@ private fun SearchSuggestionsList(
             Row(
                 modifier = modifier
                     .padding(8.dp)
-                    .background(color = colorResource(id = R.color.light_grey))
                     .clickable {
                         onChooseAirport(airport)
                     }
@@ -289,16 +290,15 @@ private fun RouteRow(
         modifier = modifier
             .padding(bottom = 6.dp)
             .clip(RoundedCornerShape(topEnd = 16.dp, bottomStart = 16.dp))
-            .background(color = colorResource(id = R.color.light_grey))
+            .background(color = Gold)
             .fillMaxSize(0.7F)
     ) {
-        var addedToFaves = false
         val fave = Favorite(
             departure_code = departingAirport.iata_code,
             destination_code = arrivingAirport.iata_code
         )
 
-        Column() {
+        Column(modifier = modifier.weight(1f)) {
             Text(
                 text = "DEPART",
                 fontSize = 12.sp,
@@ -338,20 +338,32 @@ private fun RouteRow(
                 )
             }
         }
-        IconButton(onClick = {
-            if(!addedToFaves) {
-                onFavorite(fave)
-                addedToFaves = true
-            } else {
-                onUnfavorite(fave)
-                addedToFaves = false
+        Column(
+            modifier = modifier.padding(horizontal = 8.dp)
+        ) {
+            var isFavorite by remember { mutableStateOf(false) }
+
+            IconButton(
+                onClick = {
+                    isFavorite = !isFavorite
+                    if(isFavorite) {
+                        onFavorite(fave)
+                    } else {
+                        onUnfavorite(fave)
+                    }
+                }
+            ) {
+                Image(
+                    painter = painterResource(
+                        id = if (isFavorite) {
+                            R.drawable.ic_favorited
+                        } else {
+                            R.drawable.ic_unfavorited
+                        }
+                    ),
+                    contentDescription = "Favorite"
+                )
             }
-        }) {
-            Icon(
-                Icons.Outlined.Favorite,
-                contentDescription = "Favorite",
-                modifier = modifier.size(24.dp)
-            )
         }
     }
 }
@@ -361,15 +373,6 @@ private fun RouteRow(
 @Composable
 fun SearchScreenPreview() {
     FlightSearchTheme {
-//        SearchBody(
-//            FlightSearchUiState(listOf(
-//                Airport(0, "ATH", "Athens Airport", 100),
-//                Airport(1, "CHI", "O'Hare Airport", 90)
-//            )),
-//            FavoritesUiState(listOf(
-//                Favorite(0, "ATH", "CHI"),
-//                Favorite(1, "FCO", "LIS")
-//            )),
-//        )
+        SearchScreen()
     }
 }
